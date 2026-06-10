@@ -1,0 +1,29 @@
+# Dependency directories
+node_modules/
+.pnp
+.pnp.js
+
+# Environment variables (JANGAN dicommit!)
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor configs
+.vscode/
+.idea/
+*.sw?
+
+# Testing
+coverage/

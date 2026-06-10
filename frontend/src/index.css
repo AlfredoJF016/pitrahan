@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------- CSS Reset & Base ---------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  background-color: #121212;
+  color: #ffffff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---------- Custom Utilities ---------- */
+.glow-green {
+  text-shadow: 0 0 20px rgba(57, 255, 20, 0.6), 0 0 40px rgba(57, 255, 20, 0.2);
+}
+
+.glow-cyan {
+  text-shadow: 0 0 20px rgba(0, 229, 255, 0.6), 0 0 40px rgba(0, 229, 255, 0.2);
+}
+
+/* ---------- Bento Card ---------- */
+.bento-card {
+  background: #1e1e1e;
+  border: 1px solid #2d2d2d;
+  border-radius: 1rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bento-card:hover {
+  border-color: rgba(57, 255, 20, 0.4);
+  box-shadow: 0 0 20px rgba(57, 255, 20, 0.08), 0 8px 32px rgba(0, 0, 0, 0.4);
+  transform: translateY(-2px) scale(1.005);
+}
+
+/* ---------- Digital Ticket ---------- */
+.digital-ticket {
+  background: #1e1e1e;
+  position: relative;
+  overflow: hidden;
+}
+
+.digital-ticket::before,
+.digital-ticket::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: #121212;
+  border-radius: 50%;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.digital-ticket::before { left: -10px; }
+.digital-ticket::after  { right: -10px; }
+
+/* ---------- Scrollbar Utilities ---------- */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------- Custom Range Input ---------- */
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #39FF14;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(57, 255, 20, 0.6);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #39FF14;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(57, 255, 20, 0.6);
+}
+
+/* ---------- Animated pulse green dot ---------- */
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(57,255,20,0.8); }
+  50%       { opacity: 0.5; box-shadow: 0 0 2px rgba(57,255,20,0.3); }
+}
+
+.animate-pulse-green {
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+/* ---------- Page fade-in ---------- */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
