@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const { pool } = require('../config/db');
-const { JWT_SECRET } = require('../middleware/auth');
+const { JWT_SECRET, authenticateToken } = require('../middleware/auth');
 const { authLimiter } = require('../middleware/rateLimiter');
 
 /**
@@ -132,6 +132,73 @@ router.post('/login',
         } catch (error) {
             console.error('Login Error:', error);
             res.status(500).json({ success: false, message: 'Terjadi kesalahan sistem saat login.' });
+        }
+    }
+);
+
+/**
+ * @route GET /api/auth/me
+ * @desc Get current logged-in user profile details
+ * @access Private
+ */
+router.get('/me', authenticateToken, async (req, res) => {
+    try {
+        const [users] = await pool.query('SELECT id, nama, email, role, created_at FROM users WHERE id = ?', [req.user.id]);
+        if (users.length === 0) {
+            return res.status(404).json({ success: false, message: 'User tidak ditemukan.' });
+        }
+        res.json({ success: true, data: users[0] });
+    } catch (error) {
+        console.error('Get Profile Error:', error);
+        res.status(500).json({ success: false, message: 'Terjadi kesalahan sistem saat mengambil profil.' });
+    }
+});
+
+/**
+ * @route POST /api/auth/change-password
+ * @desc Change password of currently logged-in user
+ * @access Private
+ */
+router.post('/change-password',
+    authenticateToken,
+    [
+        body('oldPassword').notEmpty().withMessage('Password lama wajib diisi.'),
+        body('newPassword').isLength({ min: 6 }).withMessage('Password baru minimal 6 karakter.')
+    ],
+    async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ success: false, errors: errors.array() });
+        }
+
+        const { oldPassword, newPassword } = req.body;
+
+        try {
+            // Retrieve current password hash
+            const [users] = await pool.query('SELECT password_hash FROM users WHERE id = ?', [req.user.id]);
+            if (users.length === 0) {
+                return res.status(404).json({ success: false, message: 'User tidak ditemukan.' });
+            }
+
+            const user = users[0];
+
+            // Compare passwords
+            const isMatch = await bcrypt.compare(oldPassword, user.password_hash);
+            if (!isMatch) {
+                return res.status(401).json({ success: false, message: 'Password lama Anda salah.' });
+            }
+
+            // Hash new password
+            const salt = await bcrypt.genSalt(10);
+            const newPasswordHash = await bcrypt.hash(newPassword, salt);
+
+            // Update user password
+            await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [newPasswordHash, req.user.id]);
+
+            res.json({ success: true, message: 'Password berhasil diubah.' });
+        } catch (error) {
+            console.error('Change Password Error:', error);
+            res.status(500).json({ success: false, message: 'Terjadi kesalahan sistem saat mengubah password.' });
         }
     }
 );

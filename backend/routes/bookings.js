@@ -404,4 +404,92 @@ router.get('/export-csv',
     }
 );
 
+/**
+ * @route GET /api/bookings/check/:code
+ * @desc Check booking status by its unique booking code
+ * @access Public
+ */
+router.get('/check/:code', async (req, res) => {
+    const code = req.params.code.trim().toUpperCase();
+
+    try {
+        const [rows] = await pool.query(`
+            SELECT 
+                b.kode_booking,
+                b.tanggal_ambil,
+                b.durasi_sewa,
+                b.total_harga,
+                b.status_booking AS status,
+                bk.nama_sepeda AS sepeda,
+                bk.foto_url,
+                s.nama_toko,
+                s.alamat AS alamat_toko,
+                s.no_telepon AS no_telepon,
+                COALESCE(u.nama, b.guest_name) AS nama_pemesan,
+                b.guest_phone AS no_hp
+            FROM bookings b
+            JOIN bikes bk ON b.bike_id = bk.id
+            JOIN rentals_stores s ON bk.store_id = s.id
+            LEFT JOIN users u ON b.customer_id = u.id
+            WHERE b.kode_booking = ?
+        `, [code]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Kode booking tidak ditemukan.' });
+        }
+
+        // Fetch addons for this booking
+        const [addons] = await pool.query(`
+            SELECT nama_alat, harga FROM booking_addons WHERE booking_id = (
+                SELECT id FROM bookings WHERE kode_booking = ?
+            )
+        `, [code]);
+
+        const bookingData = {
+            ...rows[0],
+            addons: addons
+        };
+
+        res.json(bookingData);
+    } catch (err) {
+        console.error('Check Booking Error:', err);
+        res.status(500).json({ success: false, message: 'Terjadi kesalahan sistem saat mengecek status booking.' });
+    }
+});
+
+/**
+ * @route GET /api/bookings/my-bookings
+ * @desc Get all bookings for the currently authenticated customer
+ * @access Private (Customer Only)
+ */
+router.get('/my-bookings', authenticateToken, async (req, res) => {
+    try {
+        const [rows] = await pool.query(`
+            SELECT 
+                b.id,
+                b.kode_booking,
+                b.tanggal_ambil,
+                b.durasi_sewa,
+                b.total_harga,
+                b.status_booking AS status,
+                b.created_at,
+                bk.nama_sepeda AS sepeda,
+                bk.foto_url,
+                s.nama_toko,
+                s.alamat AS alamat_toko,
+                s.no_telepon AS telp_toko
+            FROM bookings b
+            JOIN bikes bk ON b.bike_id = bk.id
+            JOIN rentals_stores s ON bk.store_id = s.id
+            WHERE b.customer_id = ?
+            ORDER BY b.created_at DESC
+        `, [req.user.id]);
+
+        res.json({ success: true, count: rows.length, data: rows });
+    } catch (err) {
+        console.error('My Bookings Error:', err);
+        res.status(500).json({ success: false, message: 'Terjadi kesalahan sistem saat mengambil riwayat booking.' });
+    }
+});
+
 module.exports = router;

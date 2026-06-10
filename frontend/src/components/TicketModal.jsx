@@ -1,95 +1,179 @@
 import React from 'react';
 
+// ─── Helper tanggal tanpa bug UTC ───
+function fmtTgl(s) {
+  if (!s) return '-';
+  const raw = (s.includes('T') ? s.split('T')[0] : s) + 'T00:00:00';
+  return new Date(raw).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+}
+
 export default function TicketModal({ bookingData, onClose }) {
   if (!bookingData) return null;
 
+  const {
+    kode_booking, sepeda, foto_url,
+    durasi_sewa, durasi_mode,
+    tanggal_ambil, waktu_ambil,
+    tanggal_kembali,
+    total_harga, status,
+    nama_toko, alamat_toko, no_telepon,
+    metode_pembayaran,
+    nama_pemesan, no_hp,
+    addons = [],
+  } = bookingData;
+
+  const satuanLabel = durasi_mode === 'jam' ? 'jam' : 'hari';
+
+  // Format metode pembayaran untuk display
+  const metodePretty = {
+    qris: 'QRIS',
+    'e-wallet': 'E-Wallet (GoPay/Dana/OVO)',
+    transfer: 'Transfer Bank BCA',
+  }[metode_pembayaran] || metode_pembayaran;
+
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/90 z-50 p-4 overflow-y-auto">
-      {/* Container holding the receipt ticket */}
-      <div className="w-full max-w-sm space-y-6 flex flex-col items-center">
-        
-        {/* Success Header Message */}
-        <div className="text-center space-y-1">
-          <div className="w-12 h-12 rounded-full bg-[#39FF14]/10 border border-[#39FF14] flex items-center justify-center mx-auto mb-2">
-            <span className="text-[#39FF14] text-xl font-bold">&#10003;</span>
+      <div className="w-full max-w-sm space-y-5 flex flex-col items-center my-4">
+
+        {/* ── Header sukses ── */}
+        <div className="text-center space-y-2">
+          <div className="w-14 h-14 rounded-full bg-[#39FF14]/10 border-2 border-[#39FF14] flex items-center justify-center mx-auto">
+            <span className="text-[#39FF14] text-2xl">✓</span>
           </div>
-          <h3 className="text-lg font-black uppercase text-white tracking-wider">Pemesanan Sukses!</h3>
-          <p className="text-xs text-[#a0a0a0]">Screenshot layar ini untuk ditunjukkan ke lokasi toko</p>
+          <h2 className="text-xl font-black uppercase text-white tracking-wider">Pemesanan Berhasil!</h2>
+          <p className="text-xs text-[#a0a0a0]">Screenshot layar ini sebagai bukti pemesanan</p>
         </div>
 
-        {/* Digital Ticket Body Card */}
-        <div className="digital-ticket w-full p-6 text-left rounded-2xl border-2 border-dashed border-[#333333] space-y-5">
-          {/* Header Ticket Section */}
-          <div className="flex justify-between items-center pb-4 border-b border-[#2d2d2d]">
-            <div className="flex flex-col">
-              <span className="text-[9px] uppercase font-bold text-[#a0a0a0]">Platform Sewa</span>
-              <span className="text-sm font-black text-[#39FF14] uppercase tracking-wide">piTrahan</span>
-            </div>
-            <div className="text-right">
-              <span className="text-[9px] uppercase font-bold text-[#a0a0a0]">Sistem Pembayaran</span>
-              <span className="text-xs font-bold text-white uppercase block">Offline / Tunai</span>
-            </div>
-          </div>
+        {/* ── Tiket digital ── */}
+        <div className="digital-ticket w-full p-5 rounded-2xl border-2 border-dashed border-[#333] space-y-4 bg-[#1a1a1a]">
 
-          {/* Large Booking Code Centerpiece */}
-          <div className="text-center py-4 bg-[#121212] border border-[#222222] rounded-xl space-y-1 my-2">
-            <span className="text-[10px] uppercase font-bold tracking-widest text-[#a0a0a0]">Kode Booking Anda</span>
-            <h1 className="text-3xl md:text-4xl font-black text-white tracking-widest uppercase glow-green select-all">
-              {bookingData.kode_booking}
-            </h1>
-          </div>
-
-          {/* Ticket Information Grid */}
-          <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-xs pt-2">
+          {/* Header tiket */}
+          <div className="flex justify-between items-start pb-3 border-b border-[#2d2d2d]">
             <div>
-              <span className="text-[9px] uppercase font-bold text-[#a0a0a0] block">Sepeda</span>
-              <span className="font-extrabold text-white uppercase line-clamp-1">{bookingData.sepeda}</span>
+              <p className="text-[8px] uppercase font-bold text-[#a0a0a0]">Platform Sewa</p>
+              <p className="text-sm font-black text-[#39FF14] uppercase tracking-wide">piTrahan Jogja</p>
             </div>
-            
             <div className="text-right">
-              <span className="text-[9px] uppercase font-bold text-[#a0a0a0] block">Durasi</span>
-              <span className="font-extrabold text-white uppercase">{bookingData.durasi_sewa} Hari</span>
-            </div>
-
-            <div>
-              <span className="text-[9px] uppercase font-bold text-[#a0a0a0] block">Tanggal Ambil</span>
-              <span className="font-extrabold text-white uppercase">
-                {new Date(bookingData.tanggal_ambil).toLocaleDateString('id-ID', {
-                  day: '2-digit',
-                  month: 'short',
-                  year: 'numeric'
-                })}
-              </span>
-            </div>
-
-            <div className="text-right">
-              <span className="text-[9px] uppercase font-bold text-[#a0a0a0] block">Total Biaya</span>
-              <span className="font-extrabold text-[#00E5FF] uppercase">
-                Rp {parseFloat(bookingData.total_harga).toLocaleString('id-ID')}
+              <p className="text-[8px] uppercase font-bold text-[#a0a0a0]">Status</p>
+              <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase bg-[#FFD700]/10 text-[#FFD700] border border-[#FFD700]/30">
+                {status === 'pending' ? 'Menunggu Konfirmasi' : status}
               </span>
             </div>
           </div>
 
-          {/* Dashed line notches separation area */}
-          <div className="border-t border-dashed border-[#333333] my-4 pt-4 text-[10px] text-[#a0a0a0] space-y-2 leading-relaxed">
-            <p className="font-bold text-white uppercase flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#39FF14]"></span>
-              Petunjuk Pengambilan:
+          {/* Kode Booking */}
+          <div className="text-center py-3 bg-[#121212] border border-[#222] rounded-xl space-y-1">
+            <p className="text-[9px] uppercase font-bold tracking-widest text-[#a0a0a0]">Kode Booking Anda</p>
+            <p className="text-3xl font-black text-white tracking-widest uppercase glow-green select-all">
+              {kode_booking}
             </p>
-            <ol className="list-decimal pl-4 space-y-1">
-              <li>Datangi toko rental terkait sesuai jadwal tanggal ambil.</li>
-              <li>Tunjukkan kode booking <span className="text-[#39FF14] font-bold">{bookingData.kode_booking}</span> ini ke kasir.</li>
-              <li>Bayar biaya sewa secara tunai/cash di tempat.</li>
-              <li>Lakukan verifikasi kondisi fisik sepeda sebelum meninggalkan lokasi.</li>
+          </div>
+
+          {/* Foto sepeda kecil + nama */}
+          {foto_url && (
+            <div className="flex items-center gap-3 p-2 bg-[#121212] border border-[#2d2d2d] rounded-xl">
+              <img src={foto_url} alt={sepeda}
+                className="w-16 h-12 object-cover rounded-lg flex-shrink-0"
+                onError={e => { e.target.style.display = 'none'; }}
+              />
+              <div>
+                <p className="text-xs font-black text-white uppercase">{sepeda}</p>
+                <p className="text-[9px] text-[#a0a0a0]">Sewa {durasi_sewa} {satuanLabel}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Grid info booking */}
+          <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-xs">
+            <div>
+              <p className="text-[8px] uppercase font-bold text-[#a0a0a0]">Pemesan</p>
+              <p className="font-bold text-white">{nama_pemesan || '-'}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[8px] uppercase font-bold text-[#a0a0a0]">No. HP</p>
+              <p className="font-bold text-white">{no_hp || '-'}</p>
+            </div>
+            <div>
+              <p className="text-[8px] uppercase font-bold text-[#a0a0a0]">Tanggal Ambil</p>
+              <p className="font-bold text-white">{fmtTgl(tanggal_ambil)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[8px] uppercase font-bold text-[#a0a0a0]">Jam Ambil</p>
+              <p className="font-bold text-[#00E5FF]">{waktu_ambil || '-'} WIB</p>
+            </div>
+            <div>
+              <p className="text-[8px] uppercase font-bold text-[#a0a0a0]">Durasi Sewa</p>
+              <p className="font-bold text-white">{durasi_sewa} {satuanLabel}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[8px] uppercase font-bold text-[#a0a0a0]">Total Biaya</p>
+              <p className="font-bold text-[#39FF14]">Rp {parseFloat(total_harga).toLocaleString('id-ID')}</p>
+            </div>
+          </div>
+
+          {/* Metode Pembayaran */}
+          <div className="px-3 py-2 bg-[#FFD700]/5 border border-[#FFD700]/20 rounded-lg">
+            <p className="text-[8px] uppercase font-bold text-[#a0a0a0]">Metode Pembayaran</p>
+            <p className="text-xs font-bold text-[#FFD700] uppercase">{metodePretty}</p>
+          </div>
+
+          {/* Info Toko */}
+          {nama_toko && (
+            <div className="p-3 bg-[#121212] border border-[#2d2d2d] rounded-xl space-y-1 text-[10px]">
+              <p className="text-[8px] uppercase font-bold text-[#a0a0a0]">🏪 Lokasi Pengambilan</p>
+              <p className="font-bold text-white">{nama_toko}</p>
+              {alamat_toko && <p className="text-[#a0a0a0]">📍 {alamat_toko}</p>}
+              {no_telepon && <p className="text-[#00E5FF] font-bold">📱 {no_telepon}</p>}
+            </div>
+          )}
+
+          {/* ══ SEKSI JAMINAN FISIK ══ */}
+          <div className="p-3 bg-[#FF3E3E]/5 border border-[#FF3E3E]/30 rounded-xl space-y-2">
+            <p className="text-[9px] font-black uppercase text-[#FF3E3E] flex items-center gap-1">
+              ⚠️ Wajib Dibawa ke Lokasi
+            </p>
+            <p className="text-[9px] text-[#a0a0a0]">
+              Tanpa jaminan berikut, pengambilan sepeda <strong className="text-white">bisa ditolak</strong> di tempat:
+            </p>
+            <div className="space-y-1.5">
+              {[
+                { icon: '🪪', text: 'KTP Asli ATAU SIM Asli (wajib salah satu)', critical: true },
+                { icon: '💵', text: 'Uang Deposit (sesuai kebijakan masing-masing toko)', critical: false },
+                { icon: '📱', text: 'Tampilkan kode booking ini ke kasir toko', critical: true },
+              ].map((item, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span className="text-sm flex-shrink-0">{item.icon}</span>
+                  <p className={`text-[9px] ${item.critical ? 'text-white font-bold' : 'text-[#a0a0a0]'}`}>
+                    {item.text}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Petunjuk Pengambilan */}
+          <div className="border-t border-dashed border-[#333] pt-3 space-y-2 text-[9px] text-[#a0a0a0]">
+            <p className="font-black text-white uppercase text-[10px]">📋 Petunjuk Pengambilan:</p>
+            <ol className="list-decimal pl-4 space-y-1 leading-relaxed">
+              <li>Datangi <strong className="text-white">{nama_toko}</strong> pada tanggal & jam yang tertera.</li>
+              <li>Tunjukkan kode booking <strong className="text-[#39FF14]">{kode_booking}</strong> ke kasir.</li>
+              <li>Serahkan jaminan fisik (KTP/SIM asli) kepada petugas.</li>
+              <li>Lakukan <strong className="text-white">verifikasi kondisi sepeda</strong> bersama petugas sebelum berangkat.</li>
+              <li>Kembalikan tepat waktu sesuai durasi. Keterlambatan dikenai biaya tambahan.</li>
             </ol>
           </div>
+
+          {/* Footer kode */}
+          <div className="text-center pt-2 border-t border-[#2d2d2d]">
+            <p className="text-[7px] text-[#555] uppercase tracking-widest">
+              piTrahan • Yogyakarta Bike Rental Platform • {new Date().getFullYear()}
+            </p>
+          </div>
         </div>
 
-        {/* Close Button / Screenshot CTA */}
-        <button 
-          onClick={onClose}
-          className="w-full py-3 bg-[#39FF14] text-black font-extrabold uppercase rounded-xl text-xs tracking-wider shadow-[0_0_15px_rgba(57,255,20,0.2)] hover:bg-white hover:shadow-none transition-all duration-300"
-        >
+        {/* Tombol tutup */}
+        <button onClick={onClose}
+          className="w-full py-3 bg-[#39FF14] text-black font-extrabold uppercase rounded-xl text-xs tracking-wider shadow-[0_0_15px_rgba(57,255,20,0.2)] hover:bg-white transition-all duration-300">
           Tutup Karcis
         </button>
       </div>

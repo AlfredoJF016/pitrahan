@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function HeroSection({ onStartRental, onManageRental }) {
+export default function HeroSection({ currentUser, onStartRental, onOpenAuth }) {
   return (
     <section className="relative min-h-[85vh] flex flex-col justify-center items-center px-6 py-12 text-center bg-[#121212] overflow-hidden">
       {/* Decorative Neon Background Blurs */}
@@ -22,26 +22,29 @@ export default function HeroSection({ onStartRental, onManageRental }) {
 
         {/* Subtitle */}
         <p className="text-[#a0a0a0] text-sm md:text-lg max-w-xl mx-auto leading-relaxed">
-          Penyewaan sepeda instan, tanpa ribet. Dukungan **Guest Booking** memudahkan mahasiswa dan wisatawan untuk langsung memesan unit secara offline.
+          Penyewaan sepeda instan, tanpa ribet.
+          Dukung pemesanan{' '}
+          <span className="text-[#39FF14] font-bold">Guest Booking</span>{' '}
+          — mahasiswa dan wisatawan bisa langsung memesan unit secara cepat.
         </p>
 
-        {/* Actions Grid */}
+        {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4 w-full max-w-md mx-auto">
-          {/* Sewa Sekarang Button */}
-          <button 
+          <button
             onClick={onStartRental}
             className="w-full sm:w-auto px-8 py-4 bg-[#39FF14] text-black font-extrabold uppercase rounded-xl tracking-wider text-sm hover:bg-white transition-all duration-300 shadow-[0_0_20px_rgba(57,255,20,0.3)] hover:shadow-none hover:scale-105 active:scale-95"
           >
             Sewa Sekarang
           </button>
-          
-          {/* Kelola Rental Button */}
-          <button 
-            onClick={onManageRental}
-            className="w-full sm:w-auto px-8 py-4 bg-[#1e1e1e] text-white border border-[#333333] hover:border-[#00E5FF] font-semibold uppercase rounded-xl tracking-wider text-sm transition-all duration-300 hover:scale-105 active:scale-95"
-          >
-            Kelola Rental
-          </button>
+
+          {!currentUser && (
+            <button
+              onClick={onOpenAuth}
+              className="w-full sm:w-auto px-8 py-4 bg-[#1e1e1e] text-white border border-[#333333] hover:border-[#00E5FF] font-semibold uppercase rounded-xl tracking-wider text-sm transition-all duration-300 hover:scale-105 active:scale-95"
+            >
+              Masuk / Daftar
+            </button>
+          )}
         </div>
       </div>
 
@@ -52,7 +55,7 @@ export default function HeroSection({ onStartRental, onManageRental }) {
           <h3 className="text-white text-sm font-bold uppercase">Guest Booking</h3>
           <p className="text-xs text-[#a0a0a0] mt-1">Pesan sepeda tanpa harus daftar akun.</p>
         </div>
-        
+
         <div className="p-5 bg-[#1e1e1e]/60 border border-[#2d2d2d] rounded-2xl text-left">
           <span className="text-[#00E5FF] text-2xl font-bold block mb-1">02</span>
           <h3 className="text-white text-sm font-bold uppercase">Bayar Offline</h3>
@@ -62,7 +65,7 @@ export default function HeroSection({ onStartRental, onManageRental }) {
         <div className="p-5 col-span-2 md:col-span-1 bg-[#1e1e1e]/60 border border-[#2d2d2d] rounded-2xl text-left">
           <span className="text-white text-2xl font-bold block mb-1">03</span>
           <h3 className="text-white text-sm font-bold uppercase">Lokasi Strategis</h3>
-          <p className="text-xs text-[#a0a0a0] mt-1">Dekat kampus & destinasi wisata Yogyakarta.</p>
+          <p className="text-xs text-[#a0a0a0] mt-1">Dekat kampus &amp; destinasi wisata Yogyakarta.</p>
         </div>
       </div>
     </section>
