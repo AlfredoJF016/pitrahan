@@ -85,21 +85,19 @@ app.use((err, req, res, next) => {
     });
 });
 
-// ── Start Server (only in non-Vercel/local development environment) ──────────
-if (!process.env.VERCEL) {
+// ── Start Server (always except in test environments) ────────────────────────
+if (process.env.NODE_ENV !== 'test') {
     app.listen(PORT, () => {
         console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode.`);
 
-        // Auto-cancel TTL checker setup (only in non-test, non-serverless environment)
-        if (process.env.NODE_ENV !== 'test') {
-            setInterval(async () => {
-                try {
-                    await autoCancelExpiredBookings();
-                } catch (err) {
-                    console.error('[piTrahan Scheduler] Error executing autoCancelExpiredBookings:', err);
-                }
-            }, 30000); // 30 seconds
-        }
+        // Auto-cancel TTL checker setup
+        setInterval(async () => {
+            try {
+                await autoCancelExpiredBookings();
+            } catch (err) {
+                console.error('[piTrahan Scheduler] Error executing autoCancelExpiredBookings:', err);
+            }
+        }, 30000); // 30 seconds
     });
 }
 
