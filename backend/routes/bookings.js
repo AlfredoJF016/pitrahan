@@ -234,7 +234,7 @@ router.post('/',
  */
 router.post('/confirm/:id',
     authenticateToken,
-    requireRole(['owner']),
+    requireRole(['owner', 'admin']),
     async (req, res) => {
         const bookingId = req.params.id;
         const ownerId = req.user.id;
@@ -262,7 +262,7 @@ router.post('/confirm/:id',
  
             const booking = bookingDetails[0];
  
-            if (booking.owner_id !== ownerId) {
+            if (req.user.role !== 'admin' && booking.owner_id !== ownerId) {
                 await connection.rollback();
                 return res.status(403).json({ 
                     success: false, 
@@ -503,7 +503,7 @@ router.get('/owner/all',
  */
 router.post('/status/:id',
     authenticateToken,
-    requireRole(['owner']),
+    requireRole(['owner', 'admin']),
     async (req, res) => {
         const bookingId = req.params.id;
         const { status } = req.body;
@@ -534,7 +534,7 @@ router.post('/status/:id',
 
             const booking = bookingDetails[0];
 
-            if (booking.owner_id !== ownerId) {
+            if (req.user.role !== 'admin' && booking.owner_id !== ownerId) {
                 await connection.rollback();
                 return res.status(403).json({ 
                     success: false, 

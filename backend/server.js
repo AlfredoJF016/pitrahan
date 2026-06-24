@@ -13,6 +13,14 @@ const PORT = process.env.PORT || 5000;
 // Trust Vercel proxy for express-rate-limit IP detection
 app.set('trust proxy', 1);
 
+// Route prefix cleanup middleware for Vercel routing fallback
+app.use((req, res, next) => {
+    if (req.url.startsWith('/_/backend')) {
+        req.url = req.url.replace('/_/backend', '');
+    }
+    next();
+});
+
 // Connect and verify DB (only in non-serverless env or on first cold start)
 checkConnection();
 
@@ -93,8 +101,8 @@ app.use((err, req, res, next) => {
     });
 });
 
-// ── Start Server (always except in test environments) ────────────────────────
-if (process.env.NODE_ENV !== 'test') {
+// ── Start Server (always except in test environments and Vercel) ──────────────
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
     app.listen(PORT, () => {
         console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode.`);
 

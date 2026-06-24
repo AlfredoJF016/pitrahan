@@ -935,31 +935,45 @@ export default function AdminDashboardModal({ user, allBikes = [], onUpdateBikeS
                     const hasBukti = !!b.bukti_transfer;
                     const isExpanded = expandedBukti === b.kode_booking;
 
-                    const handleKonfirmasi = () => {
-                      const all = JSON.parse(localStorage.getItem('pitrahan_demo_bookings') || '[]');
-                      const updated = all.map(bk =>
-                        bk.kode_booking === b.kode_booking ? { ...bk, status: 'confirmed' } : bk
-                      );
-                      localStorage.setItem('pitrahan_demo_bookings', JSON.stringify(updated));
-                      setBookings(updated);
-                      if (logActivity) {
-                        logActivity('BOOKING_CONFIRMED', `Admin mengkonfirmasi booking ${b.kode_booking} atas nama ${b.nama_pemesan}`, 'admin', user?.nama || 'Admin');
+                    const handleAction = async (newStatus) => {
+                      if (API_BASE_URL) {
+                        try {
+                          const headers = { 'Content-Type': 'application/json' };
+                          if (token) headers['Authorization'] = `Bearer ${token}`;
+                          const res = await fetch(`${API_BASE_URL}/bookings/status/${b.id}`, {
+                            method: 'POST',
+                            headers,
+                            body: JSON.stringify({ status: newStatus })
+                          });
+                          const data = await res.json();
+                          if (!res.ok) throw new Error(data.message || 'Gagal mengubah status booking.');
+                          
+                          setBookings(prev => prev.map(bk => bk.kode_booking === b.kode_booking ? { ...bk, status: newStatus } : bk));
+                        } catch (err) {
+                          alert(`❌ ${err.message}`);
+                          return;
+                        }
+                      } else {
+                        const all = JSON.parse(localStorage.getItem('pitrahan_demo_bookings') || '[]');
+                        const updated = all.map(bk =>
+                          bk.kode_booking === b.kode_booking ? { ...bk, status: newStatus } : bk
+                        );
+                        localStorage.setItem('pitrahan_demo_bookings', JSON.stringify(updated));
+                        setBookings(updated);
                       }
-                      alert(`✅ Booking ${b.kode_booking} telah dikonfirmasi!`);
+
+                      if (logActivity) {
+                        const actKey = newStatus === 'confirmed' ? 'BOOKING_CONFIRMED' : 'BOOKING_REJECTED';
+                        const actDesc = newStatus === 'confirmed' 
+                          ? `Admin mengkonfirmasi booking ${b.kode_booking} atas nama ${b.nama_pemesan}`
+                          : `Admin menolak booking ${b.kode_booking} atas nama ${b.nama_pemesan}`;
+                        logActivity(actKey, actDesc, 'admin', user?.nama || 'Admin');
+                      }
+                      alert(newStatus === 'confirmed' ? `✅ Booking ${b.kode_booking} telah dikonfirmasi!` : `❌ Booking ${b.kode_booking} telah ditolak.`);
                     };
 
-                    const handleTolak = () => {
-                      const all = JSON.parse(localStorage.getItem('pitrahan_demo_bookings') || '[]');
-                      const updated = all.map(bk =>
-                        bk.kode_booking === b.kode_booking ? { ...bk, status: 'rejected' } : bk
-                      );
-                      localStorage.setItem('pitrahan_demo_bookings', JSON.stringify(updated));
-                      setBookings(updated);
-                      if (logActivity) {
-                        logActivity('BOOKING_REJECTED', `Admin menolak booking ${b.kode_booking} atas nama ${b.nama_pemesan}`, 'admin', user?.nama || 'Admin');
-                      }
-                      alert(`❌ Booking ${b.kode_booking} telah ditolak.`);
-                    };
+                    const handleKonfirmasi = () => handleAction('confirmed');
+                    const handleTolak = () => handleAction('rejected');
 
                     return (
                       <div key={b.kode_booking} className={`rounded-xl border transition-all overflow-hidden ${b.metode_pembayaran === 'offline' ? 'border-[#39FF14]/20 bg-[#39FF14]/2' : hasBukti ? 'border-[#FFD700]/30 bg-[#FFD700]/3' : 'border-[#2d2d2d] bg-[#111]'}`}>
