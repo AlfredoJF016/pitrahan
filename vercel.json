@@ -9,11 +9,5 @@
       "root": "backend",
       "routePrefix": "/_/backend"
     }
-  },
-  "crons": [
-    {
-      "path": "/_/backend/api/cron/cancel-expired",
-      "schedule": "*/15 * * * *"
-    }
-  ]
+  }
 }
