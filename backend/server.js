@@ -10,60 +10,98 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Connect and verify DB
+// Connect and verify DB (only in non-serverless env or on first cold start)
 checkConnection();
+
+// ── Allowed Origins ──────────────────────────────────────────────────────────
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : ['http://localhost:5173'];
 
 // Global Security Middlewares
 app.use(helmet()); // Adds various HTTP headers for XSS, Clickjacking protection
 app.use(cors({
-    origin: process.env.CLIENT_URL || '*', // Restrict to trusted client URL in production
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    origin: function (origin, callback) {
+        // Allow requests with no origin (e.g. mobile apps, curl, Vercel internal)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        return callback(new Error('Not allowed by CORS'));
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Input sanitization constraints: allow larger payloads for base64 image proofs
-app.use(express.json({ limit: '10mb' })); 
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Health Check API
+// ── Health Check API ─────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
     res.json({ success: true, message: 'Server piTrahan dalam keadaan aktif dan sehat.' });
 });
 
-// Mount Routes
+// ── Cron Endpoint (Vercel Cron Job — runs every 15 minutes) ─────────────────
+// Replaces setInterval which is not supported in Vercel serverless environment
+app.get('/api/cron/cancel-expired', async (req, res) => {
+    // Basic security: only allow Vercel Cron or internal calls
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret) {
+        const authHeader = req.headers['authorization'];
+        if (authHeader !== `Bearer ${cronSecret}`) {
+            return res.status(401).json({ success: false, message: 'Unauthorized cron call.' });
+        }
+    }
+
+    try {
+        await autoCancelExpiredBookings();
+        res.json({ success: true, message: 'Auto-cancel check selesai.' });
+    } catch (err) {
+        console.error('[piTrahan Cron] Error:', err);
+        res.status(500).json({ success: false, message: 'Cron job gagal dijalankan.' });
+    }
+});
+
+// ── Mount Routes ─────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/profile', profileRoutes);
 
-// 404 Route handler
+// ── 404 Route handler ────────────────────────────────────────────────────────
 app.use((req, res, next) => {
     res.status(404).json({ success: false, message: 'Resource tidak ditemukan.' });
 });
 
-// Centralized error handling middleware (prevents stacktrace leakage to users)
+// ── Centralized error handling middleware ────────────────────────────────────
 app.use((err, req, res, next) => {
     console.error('Unhandled Server Error:', err.stack);
-    
+
     res.status(err.status || 500).json({
         success: false,
-        message: process.env.NODE_ENV === 'production' 
-            ? 'Terjadi kesalahan sistem internal.' 
+        message: process.env.NODE_ENV === 'production'
+            ? 'Terjadi kesalahan sistem internal.'
             : err.message
     });
 });
 
-// Start Server & TTL Auto-cancel checker interval (every 30 seconds)
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode.`);
-    
-    // Auto-cancel TTL checker setup
-    if (process.env.NODE_ENV !== 'test') {
-        setInterval(async () => {
-            try {
-                await autoCancelExpiredBookings();
-            } catch (err) {
-                console.error('[piTrahan Scheduler] Error executing autoCancelExpiredBookings:', err);
-            }
-        }, 30000); // 30 seconds
-    }
-});
+// ── Start Server (only in non-Vercel/local development environment) ──────────
+if (!process.env.VERCEL) {
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode.`);
+
+        // Auto-cancel TTL checker setup (only in non-test, non-serverless environment)
+        if (process.env.NODE_ENV !== 'test') {
+            setInterval(async () => {
+                try {
+                    await autoCancelExpiredBookings();
+                } catch (err) {
+                    console.error('[piTrahan Scheduler] Error executing autoCancelExpiredBookings:', err);
+                }
+            }, 30000); // 30 seconds
+        }
+    });
+}
+
+// ── Export app for Vercel Serverless Function ────────────────────────────────
+module.exports = app;

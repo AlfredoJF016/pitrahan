@@ -3,10 +3,14 @@ node_modules/
 .pnp
 .pnp.js
 
-# Environment variables (JANGAN dicommit!)
+# Environment variables (JANGAN dicommit! — file rahasia)
 .env
 .env.local
 .env.*.local
+
+# NOTE: .env.production dan .env.example boleh di-commit (tidak ada secret di dalamnya)
+# .env.production — hanya berisi VITE_API_BASE_URL=/api (tidak ada secret)
+# .env.example    — template dokumentasi
 
 # Build output
 dist/
