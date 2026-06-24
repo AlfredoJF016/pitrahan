@@ -32,7 +32,7 @@ app.use(cors({
         // Allow explicitly listed origins
         if (allowedOrigins.includes(origin)) return callback(null, true);
         // Allow ALL *.vercel.app subdomains (covers preview & production URLs)
-        if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin)) return callback(null, true);
+        if (/^https:\/\/.*\.vercel\.app$/i.test(origin)) return callback(null, true);
         // Allow localhost on any port for local development
         if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
         return callback(new Error('Not allowed by CORS'));

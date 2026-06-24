@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 
 function fmtTgl(s) {
   if (!s) return '-';
@@ -385,7 +385,7 @@ function AdminBikeFormModal({ bike, activeOwners, onSave, onCancel }) {
   );
 }
 
-export default function AdminDashboardModal({ user, allBikes = [], onUpdateBikeStatus, onAddBike, onEditBike, onDeleteBike, onClose, logActivity, onOpenProfile }) {
+export default function AdminDashboardModal({ user, allBikes = [], onUpdateBikeStatus, onAddBike, onEditBike, onDeleteBike, onClose, logActivity, onOpenProfile, API_BASE_URL, token }) {
   const [tab, setTab] = useState('overview');
 
   const [users, setUsers] = useState(() => {
@@ -403,6 +403,35 @@ export default function AdminDashboardModal({ user, allBikes = [], onUpdateBikeS
     try { return JSON.parse(localStorage.getItem('pitrahan_demo_bookings') || '[]'); }
     catch { return []; }
   });
+
+  // Fetch bookings from API (production) or fallback to localStorage (demo mode)
+  useEffect(() => {
+    async function fetchBookings() {
+      if (!API_BASE_URL) return; // demo mode — bookings already loaded from localStorage
+      try {
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch(`${API_BASE_URL}/bookings/admin/all`, { headers });
+        if (!res.ok) return; // silently fail, keep localStorage bookings
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          // Normalize API booking fields to match admin dashboard expectations
+          const normalized = data.data.map(b => ({
+            ...b,
+            status: b.status_booking || b.status || 'pending',
+            sepeda: b.nama_sepeda || b.sepeda || '-',
+            nama_pemesan: b.nama_pemesan || b.guest_name || '-',
+            kode_booking: b.kode_booking || '-',
+            total_harga: parseFloat(b.total_harga || 0),
+          }));
+          setBookings(normalized);
+        }
+      } catch (err) {
+        console.error('Admin: failed to fetch bookings from API:', err);
+      }
+    }
+    fetchBookings();
+  }, [API_BASE_URL, token]);
 
   const [selectedOwner, setSelectedOwner] = useState(null);
 

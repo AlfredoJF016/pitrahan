@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 
 function fmtTgl(s) {
   if (!s) return '-';
@@ -408,7 +408,7 @@ function EmailSimModal({ booking, type, onClose }) {
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────
-export default function OwnerDashboardModal({ user, bikes: initialBikes, onUpdateBikeStatus, onAddBike, onEditBike, onDeleteBike, onClose, logActivity }) {
+export default function OwnerDashboardModal({ user, bikes: initialBikes, onUpdateBikeStatus, onAddBike, onEditBike, onDeleteBike, onClose, logActivity, API_BASE_URL, token }) {
   const [activeTab, setActiveTab] = useState('overview');
 
   const bikes = initialBikes;
@@ -427,6 +427,33 @@ export default function OwnerDashboardModal({ user, bikes: initialBikes, onUpdat
     localStorage.setItem('pitrahan_demo_bookings', JSON.stringify(merged));
     setBookings(updated);
   };
+
+  useEffect(() => {
+    async function fetchBookings() {
+      if (!API_BASE_URL) return;
+      try {
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch(`${API_BASE_URL}/bookings/owner/all`, { headers });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          const normalized = data.data.map(b => ({
+            ...b,
+            status: b.status_booking || b.status || 'pending',
+            sepeda: b.nama_sepeda || b.sepeda || '-',
+            nama_pemesan: b.nama_pemesan || b.guest_name || '-',
+            kode_booking: b.kode_booking || '-',
+            total_harga: parseFloat(b.total_harga || 0),
+          }));
+          setBookings(normalized);
+        }
+      } catch (err) {
+        console.error('Owner: failed to fetch bookings from API:', err);
+      }
+    }
+    fetchBookings();
+  }, [API_BASE_URL, token]);
 
   // ── Modal States ──
   const [bikeFormState, setBikeFormState] = useState(null); // null | { mode: 'add' } | { mode: 'edit', bike }
@@ -449,10 +476,31 @@ export default function OwnerDashboardModal({ user, bikes: initialBikes, onUpdat
   const historyB = bookings.filter(b => ['completed','rejected','cancelled'].includes(b.status));
 
   // ── Booking Actions ──
-  const handleBookingAction = (kode, newStatus) => {
+  const handleBookingAction = async (kode, newStatus) => {
     const booking = bookings.find(b => b.kode_booking === kode);
-    const updated = bookings.map(b => b.kode_booking === kode ? { ...b, status: newStatus } : b);
-    saveBookings(updated);
+    if (!booking) return;
+
+    if (API_BASE_URL) {
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch(`${API_BASE_URL}/bookings/status/${booking.id}`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ status: newStatus })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Gagal mengubah status booking.');
+
+        setBookings(prev => prev.map(b => b.kode_booking === kode ? { ...b, status: newStatus } : b));
+      } catch (err) {
+        alert(`❌ ${err.message}`);
+        return;
+      }
+    } else {
+      const updated = bookings.map(b => b.kode_booking === kode ? { ...b, status: newStatus } : b);
+      saveBookings(updated);
+    }
 
     if (logActivity && booking) {
       const actionMap = { confirmed: 'BOOKING_CONFIRMED', rejected: 'BOOKING_REJECTED', completed: 'BOOKING_COMPLETED' };

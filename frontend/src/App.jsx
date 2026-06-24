@@ -631,7 +631,7 @@ export default function App() {
         const res = await fetch(`${API_BASE_URL}/bookings`, { method: 'POST', headers, body: JSON.stringify(formData) });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Gagal membuat booking.');
-        const bike = bikes.find(b => b.id === formData.bike_id);
+        const bike = bikes.find(b => Number(b.id) === Number(formData.bike_id));
         const bData = {
           ...data.data,
           ...bike,
@@ -744,6 +744,8 @@ export default function App() {
           onClose={handleLogout}
           logActivity={logActivity}
           onOpenProfile={() => setShowProfileModal(true)}
+          API_BASE_URL={API_BASE_URL}
+          token={token}
         />
         {showProfileModal && (
           <ProfileDashboardModal
@@ -817,6 +819,8 @@ export default function App() {
           onDeleteBike={handleDeleteBike}
           onClose={() => setShowOwnerModal(false)}
           logActivity={logActivity}
+          API_BASE_URL={API_BASE_URL}
+          token={token}
         />
       )}
 

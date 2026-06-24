@@ -162,6 +162,7 @@ export default function TicketModal({ bookingData, onClose, onOpenEmail }) {
     metode_pembayaran,
     nama_pemesan, no_hp,
     addons = [],
+    deposit_fee,
   } = bookingData;
 
   const satuanLabel = durasi_mode === 'jam' ? 'jam' : 'hari';

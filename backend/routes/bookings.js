@@ -408,6 +408,180 @@ router.get('/export-csv',
 );
 
 /**
+ * @route GET /api/bookings/admin/all
+ * @desc Get ALL bookings (Admin only) for the admin dashboard
+ * @access Private (Admin Only)
+ */
+router.get('/admin/all',
+    authenticateToken,
+    requireRole(['admin']),
+    async (req, res) => {
+        try {
+            const [rows] = await pool.query(`
+                SELECT
+                    b.id,
+                    b.kode_booking,
+                    b.tanggal_ambil,
+                    b.durasi_sewa,
+                    b.total_harga,
+                    b.status_booking,
+                    b.metode_pembayaran,
+                    b.bukti_transfer,
+                    b.created_at,
+                    bk.nama_sepeda,
+                    bk.foto_url,
+                    s.nama_toko,
+                    s.alamat AS alamat_toko,
+                    COALESCE(u.nama, b.guest_name) AS nama_pemesan,
+                    COALESCE(u.email, 'Guest') AS email_pemesan,
+                    COALESCE(b.guest_phone, u.no_telepon) AS no_hp
+                FROM bookings b
+                JOIN bikes bk ON b.bike_id = bk.id
+                JOIN rentals_stores s ON bk.store_id = s.id
+                LEFT JOIN users u ON b.customer_id = u.id
+                ORDER BY b.created_at DESC
+                LIMIT 500
+            `);
+
+            res.json({ success: true, count: rows.length, data: rows });
+        } catch (err) {
+            console.error('Admin All Bookings Error:', err);
+            res.status(500).json({ success: false, message: 'Terjadi kesalahan sistem saat mengambil semua transaksi.' });
+        }
+    }
+);
+
+/**
+ * @route GET /api/bookings/owner/all
+ * @desc Get all bookings for the stores owned by the authenticated owner
+ * @access Private (Owner Only)
+ */
+router.get('/owner/all',
+    authenticateToken,
+    requireRole(['owner']),
+    async (req, res) => {
+        try {
+            const [rows] = await pool.query(`
+                SELECT
+                    b.id,
+                    b.kode_booking,
+                    b.tanggal_ambil,
+                    b.durasi_sewa,
+                    b.total_harga,
+                    b.status_booking,
+                    b.metode_pembayaran,
+                    b.bukti_transfer,
+                    b.created_at,
+                    bk.nama_sepeda,
+                    bk.foto_url,
+                    s.nama_toko,
+                    s.alamat AS alamat_toko,
+                    COALESCE(u.nama, b.guest_name) AS nama_pemesan,
+                    COALESCE(u.email, 'Guest') AS email_pemesan,
+                    COALESCE(b.guest_phone, u.no_telepon) AS no_hp
+                FROM bookings b
+                JOIN bikes bk ON b.bike_id = bk.id
+                JOIN rentals_stores s ON bk.store_id = s.id
+                LEFT JOIN users u ON b.customer_id = u.id
+                WHERE s.owner_id = ?
+                ORDER BY b.created_at DESC
+                LIMIT 500
+            `, [req.user.id]);
+
+            res.json({ success: true, count: rows.length, data: rows });
+        } catch (err) {
+            console.error('Owner All Bookings Error:', err);
+            res.status(500).json({ success: false, message: 'Terjadi kesalahan sistem saat mengambil transaksi toko.' });
+        }
+    }
+);
+
+/**
+ * @route POST /api/bookings/status/:id
+ * @desc Update booking status (confirmed, rejected, completed) (Owner only, IDOR-safe verification)
+ * @access Private (Owner Only)
+ */
+router.post('/status/:id',
+    authenticateToken,
+    requireRole(['owner']),
+    async (req, res) => {
+        const bookingId = req.params.id;
+        const { status } = req.body;
+        const ownerId = req.user.id;
+
+        if (!['confirmed', 'rejected', 'completed', 'cancelled'].includes(status)) {
+            return res.status(400).json({ success: false, message: 'Status tidak valid.' });
+        }
+
+        const connection = await pool.getConnection();
+
+        try {
+            await connection.beginTransaction();
+
+            // Verify owner owns the store of the booking
+            const [bookingDetails] = await connection.query(`
+                SELECT b.id, b.bike_id, b.status_booking, s.owner_id, bk.status_ketersediaan AS bike_status 
+                FROM bookings b
+                JOIN bikes bk ON b.bike_id = bk.id
+                JOIN rentals_stores s ON bk.store_id = s.id
+                WHERE b.id = ? FOR UPDATE
+            `, [bookingId]);
+
+            if (bookingDetails.length === 0) {
+                await connection.rollback();
+                return res.status(404).json({ success: false, message: 'Transaksi booking tidak ditemukan.' });
+            }
+
+            const booking = bookingDetails[0];
+
+            if (booking.owner_id !== ownerId) {
+                await connection.rollback();
+                return res.status(403).json({ 
+                    success: false, 
+                    message: 'Akses ditolak: Anda bukan pemilik toko rental sepeda untuk pemesanan ini.' 
+                });
+            }
+
+            // Update Booking Status
+            await connection.query(
+                "UPDATE bookings SET status_booking = ? WHERE id = ?",
+                [status, bookingId]
+            );
+
+            // Update Bike Availability Status based on booking status
+            let newBikeStatus = 'tersedia';
+            if (status === 'confirmed') {
+                newBikeStatus = 'disewa';
+            } else if (status === 'rejected' || status === 'completed' || status === 'cancelled') {
+                newBikeStatus = 'tersedia';
+            } else {
+                newBikeStatus = booking.bike_status;
+            }
+
+            await connection.query(
+                "UPDATE bikes SET status_ketersediaan = ? WHERE id = ?",
+                [newBikeStatus, booking.bike_id]
+            );
+
+            await connection.commit();
+
+            res.json({
+                success: true,
+                message: `Status pemesanan berhasil diperbarui menjadi ${status}.`
+            });
+
+        } catch (err) {
+            await connection.rollback();
+            console.error('Update Booking Status Error:', err);
+            res.status(500).json({ success: false, message: 'Terjadi kesalahan sistem saat memperbarui status booking.' });
+        } finally {
+            connection.release();
+        }
+    }
+);
+
+
+/**
  * @route GET /api/bookings/check/:code
  * @desc Check booking status by its unique booking code
  * @access Public
