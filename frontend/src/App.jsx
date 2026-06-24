@@ -344,6 +344,37 @@ export default function App() {
     localStorage.setItem('pitrahan_owner_bikes', JSON.stringify(updated));
   };
 
+  const loadBikesFromServer = useCallback(async () => {
+    if (!API_BASE_URL) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/bookings/bikes`);
+      if (res.ok) {
+        const d = await res.json();
+        if (d.success && Array.isArray(d.data)) {
+          const mapped = d.data.map(dbBike => {
+            const seed = SEED_BIKES.find(s => s.id === dbBike.id) || {};
+            return {
+              ...seed,
+              ...dbBike,
+              no_telepon: dbBike.telp_toko || dbBike.no_telepon || seed.no_telepon,
+              alamat_toko: dbBike.alamat_toko || seed.alamat_toko,
+              jam_operasional: dbBike.jam_operasional || seed.jam_operasional || '08:00 – 20:00 WIB',
+            };
+          });
+          setBikes(mapped);
+          localStorage.setItem('pitrahan_owner_bikes', JSON.stringify(mapped));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load bikes from server:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadBikesFromServer();
+  }, [loadBikesFromServer]);
+
+
   // ── Auth state ──
   const [currentUser, setCurrentUser] = useState(() => {
     try { const s = localStorage.getItem('pitrahan_user'); return s ? JSON.parse(s) : null; }
@@ -635,11 +666,13 @@ export default function App() {
         const bData = {
           ...data.data,
           ...bike,
+          status: data.data.status_booking || 'pending',
           nama_pemesan: currentUser?.nama || formData.guest_name || 'Tamu',
           no_hp: currentUser?.no_telepon || formData.guest_phone || '-',
           email: currentUser?.email || formData.guest_email || ''
         };
         setCompletedBooking(bData);
+        loadBikesFromServer();
         setTimeout(() => {
           setEmailNotification({
             subject: `Konfirmasi Pemesanan Sepeda - ${data.data.kode_booking || bData.kode_booking}`,
