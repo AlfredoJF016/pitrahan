@@ -10,6 +10,9 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Trust Vercel proxy for express-rate-limit IP detection
+app.set('trust proxy', 1);
+
 // Connect and verify DB (only in non-serverless env or on first cold start)
 checkConnection();
 
