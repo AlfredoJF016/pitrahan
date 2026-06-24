@@ -24,9 +24,14 @@ app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (e.g. mobile apps, curl, Vercel internal)
         if (!origin) return callback(null, true);
-        if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
-            return callback(null, true);
-        }
+        // Allow wildcard '*'
+        if (allowedOrigins.includes('*')) return callback(null, true);
+        // Allow explicitly listed origins
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        // Allow ALL *.vercel.app subdomains (covers preview & production URLs)
+        if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin)) return callback(null, true);
+        // Allow localhost on any port for local development
+        if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
         return callback(new Error('Not allowed by CORS'));
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
