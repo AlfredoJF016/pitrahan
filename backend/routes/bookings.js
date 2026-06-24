@@ -97,6 +97,7 @@ router.post('/',
         body('durasi_sewa').isInt({ min: 1 }).withMessage('Durasi sewa minimal 1 hari.'),
         body('addons').optional().isArray(),
         body('addons.*.nama_alat').optional().isIn(['helm', 'kunci_pengaman']),
+        body('metode_pembayaran').optional().isIn(['qris', 'transfer', 'offline']).withMessage('Metode pembayaran tidak valid.'),
         // Guest Validations & Sanitization to prevent Stored XSS and invalid input formats
         body('guest_name')
             .if((value, { req }) => !req.user)
@@ -118,12 +119,13 @@ router.post('/',
             return res.status(400).json({ success: false, errors: errors.array() });
         }
 
-        const { bike_id, tanggal_ambil, durasi_sewa, addons = [], guest_name, guest_phone } = req.body;
+        const { bike_id, tanggal_ambil, durasi_sewa, addons = [], guest_name, guest_phone, metode_pembayaran } = req.body;
         
         // Determine customer variables
         const customerId = req.user ? req.user.id : null;
         const gName = req.user ? null : guest_name.trim();
         const gPhone = req.user ? null : guest_phone.trim();
+        const metodePembayaran = metode_pembayaran || 'offline';
 
         // Get DB connection for transaction execution
         const connection = await pool.getConnection();
@@ -182,9 +184,9 @@ router.post('/',
             // Insert Booking
             const [bookingResult] = await connection.query(
                 `INSERT INTO bookings 
-                 (customer_id, guest_name, guest_phone, bike_id, kode_booking, tanggal_ambil, durasi_sewa, total_harga, status_booking) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-                [customerId, gName, gPhone, bike_id, kodeBooking, tanggal_ambil, durasi_sewa, grandTotal]
+                 (customer_id, guest_name, guest_phone, bike_id, kode_booking, tanggal_ambil, durasi_sewa, total_harga, metode_pembayaran, status_booking) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+                [customerId, gName, gPhone, bike_id, kodeBooking, tanggal_ambil, durasi_sewa, grandTotal, metodePembayaran]
             );
 
             const bookingId = bookingResult.insertId;
@@ -209,6 +211,7 @@ router.post('/',
                     tanggal_ambil,
                     durasi_sewa,
                     total_harga: grandTotal,
+                    metode_pembayaran: metodePembayaran,
                     status_booking: 'pending',
                     sepeda: bike.nama_sepeda
                 }
@@ -420,8 +423,12 @@ router.get('/check/:code', async (req, res) => {
                 b.durasi_sewa,
                 b.total_harga,
                 b.status_booking AS status,
+                b.metode_pembayaran,
+                b.bukti_transfer,
+                b.bukti_sent_at,
                 bk.nama_sepeda AS sepeda,
                 bk.foto_url,
+                bk.deposit_fee,
                 s.nama_toko,
                 s.alamat AS alamat_toko,
                 s.no_telepon AS no_telepon,
@@ -492,4 +499,99 @@ router.get('/my-bookings', authenticateToken, async (req, res) => {
     }
 });
 
-module.exports = router;
+/**
+ * @route POST /api/bookings/proof/:code
+ * @desc Upload base64 payment proof for a booking
+ * @access Public
+ */
+router.post('/proof/:code', [
+    body('bukti_transfer').notEmpty().withMessage('Bukti transfer tidak boleh kosong.')
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const code = req.params.code.trim().toUpperCase();
+    const { bukti_transfer } = req.body;
+
+    try {
+        const [rows] = await pool.query(
+            "SELECT id, status_booking FROM bookings WHERE kode_booking = ?",
+            [code]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Kode booking tidak ditemukan.' });
+        }
+
+        const booking = rows[0];
+        if (booking.status_booking === 'expired' || booking.status_booking === 'cancelled') {
+            return res.status(400).json({ success: false, message: 'Pemesanan sudah dibatalkan atau kedaluwarsa.' });
+        }
+
+        await pool.query(
+            "UPDATE bookings SET bukti_transfer = ?, bukti_sent_at = NOW() WHERE kode_booking = ?",
+            [bukti_transfer, code]
+        );
+
+        res.json({ success: true, message: 'Bukti transfer berhasil diunggah.' });
+    } catch (err) {
+        console.error('Upload Proof Error:', err);
+        res.status(500).json({ success: false, message: 'Terjadi kesalahan sistem saat mengunggah bukti transfer.' });
+    }
+});
+
+/**
+ * Auto-cancel pending transfer/QRIS bookings that are older than 15 minutes and have no proof of payment.
+ * ACID transaction safe, locks affected rows.
+ */
+async function autoCancelExpiredBookings() {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // 1. Get pending QRIS/Transfer bookings created more than 15 minutes ago with no proof
+        const [expired] = await connection.query(`
+            SELECT id, bike_id FROM bookings
+            WHERE status_booking = 'pending'
+              AND metode_pembayaran IN ('qris', 'transfer')
+              AND created_at < NOW() - INTERVAL 15 MINUTE
+              AND bukti_transfer IS NULL
+            FOR UPDATE
+        `);
+
+        if (expired.length > 0) {
+            const bookingIds = expired.map(b => b.id);
+            const bikeIds = expired.map(b => b.bike_id);
+
+            // 2. Mark bookings as expired
+            await connection.query(`
+                UPDATE bookings
+                SET status_booking = 'expired'
+                WHERE id IN (?)
+            `, [bookingIds]);
+
+            // 3. Mark the corresponding bikes as 'tersedia' again
+            await connection.query(`
+                UPDATE bikes
+                SET status_ketersediaan = 'tersedia'
+                WHERE id IN (?)
+            `, [bikeIds]);
+
+            console.log(`[piTrahan Auto-Cancel] Expired ${expired.length} booking(s): IDs [${bookingIds.join(', ')}]`);
+        }
+
+        await connection.commit();
+    } catch (err) {
+        await connection.rollback();
+        console.error('[piTrahan Auto-Cancel] Error running auto-cancel job:', err);
+    } finally {
+        connection.release();
+    }
+}
+
+module.exports = {
+    router,
+    autoCancelExpiredBookings
+};

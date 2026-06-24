@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // ─── SHA-256 hash (demo security) ───
 async function hashPassword(pw) {
@@ -12,7 +12,7 @@ async function verifyPassword(pw, hash) {
 const isValidEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 const isValidPhone = p => /^[0-9+\- ]{8,20}$/.test(p.trim());
 
-export default function LoginRegisterModal({ API_BASE_URL, onLoginSuccess, onClose }) {
+export default function LoginRegisterModal({ API_BASE_URL, onLoginSuccess, onClose, logActivity }) {
   const [activeTab, setActiveTab] = useState('login');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
@@ -25,9 +25,24 @@ export default function LoginRegisterModal({ API_BASE_URL, onLoginSuccess, onClo
   const [nama, setNama]   = useState('');
   const [noHp, setNoHp]   = useState('');
 
+  const [showLoginPw, setShowLoginPw] = useState(false);
+  const [showRegisterPw, setShowRegisterPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+
+  useEffect(() => {
+    setEmail('');
+    setPassword('');
+    setConfirmPw('');
+    setNama('');
+    setNoHp('');
+  }, []);
+
   const switchTab = tab => {
     setActiveTab(tab);
-    setError(''); setSuccess(''); setPassword(''); setConfirmPw('');
+    setError(''); setSuccess('');
+    setEmail(''); setPassword(''); setConfirmPw('');
+    setNama(''); setNoHp('');
+    setShowLoginPw(false); setShowRegisterPw(false); setShowConfirmPw(false);
   };
 
   // ══════ LOGIN ══════
@@ -112,6 +127,14 @@ export default function LoginRegisterModal({ API_BASE_URL, onLoginSuccess, onClo
         };
         users.push(newUser);
         localStorage.setItem('pitrahan_users', JSON.stringify(users));
+        if (logActivity) {
+          logActivity(
+            'REGISTRASI',
+            `Pengguna baru ${namaVal} (${emailVal}) berhasil terdaftar di platform (Demo Mode).`,
+            'customer',
+            namaVal
+          );
+        }
       }
 
       setSuccess('Pendaftaran berhasil! Silakan masuk dengan email Anda.');
@@ -159,26 +182,22 @@ export default function LoginRegisterModal({ API_BASE_URL, onLoginSuccess, onClo
               </div>
               <div className="space-y-1.5">
                 <label className={lbl}>Password</label>
-                <input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className={inp} />
+                <div className="relative">
+                  <input type={showLoginPw ? 'text' : 'password'} autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className={inp + ' pr-10'} />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPw(s => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#555] hover:text-[#a0a0a0] text-sm transition-colors"
+                    aria-label={showLoginPw ? 'Sembunyikan password' : 'Tampilkan password'}
+                  >
+                    {showLoginPw ? '🙈' : '👁'}
+                  </button>
+                </div>
               </div>
               <button type="submit" disabled={loading}
                 className="w-full py-3 bg-[#39FF14] text-black font-extrabold uppercase rounded-xl text-xs tracking-wider hover:bg-white transition-all disabled:opacity-50">
                 {loading ? <span className="flex items-center justify-center gap-2"><span className="w-3 h-3 border-2 border-black border-t-transparent rounded-full animate-spin"/>Memproses...</span> : 'Masuk Sekarang'}
               </button>
-
-              {/* Credentials hint */}
-              <div className="p-3 bg-[#121212] border border-[#2d2d2d] rounded-xl text-[9px] text-[#a0a0a0] space-y-1.5">
-                <p className="font-bold text-[#39FF14] uppercase">Akun Terdaftar (Demo & DB Seed):</p>
-                <p className="text-white"><span className="text-[#FF3E3E] font-bold">🔐 Admin:</span> admin@gmail.com / password123</p>
-                <p className="text-white"><span className="text-[#FFD700] font-bold">🏪 Owner:</span> owner@gmail.com / password123</p>
-                <p className="font-bold text-[#00E5FF] uppercase mt-1">👤 Customer (password: user123 / password123):</p>
-                <ul className="pl-3 list-disc text-[#a0a0a0] space-y-0.5">
-                  <li>customer@gmail.com (Budi - DB / password123)</li>
-                  <li>john@example.com (John Doe - Demo / user123)</li>
-                  <li>budi@santoso.id (Budi Santoso - Demo / user123)</li>
-                  <li>citra@mail.com (Citra Kirana - Demo / user123)</li>
-                </ul>
-              </div>
 
               <p className="text-center text-[10px] text-[#a0a0a0]">Belum punya akun?{' '}
                 <button type="button" onClick={() => switchTab('register')} className="text-[#39FF14] font-bold hover:underline">Daftar di sini</button>
@@ -206,11 +225,31 @@ export default function LoginRegisterModal({ API_BASE_URL, onLoginSuccess, onClo
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className={lbl}>Password *</label>
-                  <input type="password" autoComplete="new-password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Min. 6 karakter" className={inp} />
+                  <div className="relative">
+                    <input type={showRegisterPw ? 'text' : 'password'} autoComplete="new-password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Min. 6 karakter" className={inp + ' pr-10'} />
+                    <button
+                      type="button"
+                      onClick={() => setShowRegisterPw(s => !s)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#555] hover:text-[#a0a0a0] text-sm transition-colors"
+                      aria-label={showRegisterPw ? 'Sembunyikan password' : 'Tampilkan password'}
+                    >
+                      {showRegisterPw ? '🙈' : '👁'}
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <label className={lbl}>Ulangi Password *</label>
-                  <input type="password" autoComplete="new-password" required value={confirmPw} onChange={e => setConfirmPw(e.target.value)} placeholder="••••••••" className={inp} />
+                  <div className="relative">
+                    <input type={showConfirmPw ? 'text' : 'password'} autoComplete="new-password" required value={confirmPw} onChange={e => setConfirmPw(e.target.value)} placeholder="••••••••" className={inp + ' pr-10'} />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPw(s => !s)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#555] hover:text-[#a0a0a0] text-sm transition-colors"
+                      aria-label={showConfirmPw ? 'Sembunyikan password' : 'Tampilkan password'}
+                    >
+                      {showConfirmPw ? '🙈' : '👁'}
+                    </button>
+                  </div>
                 </div>
               </div>
 

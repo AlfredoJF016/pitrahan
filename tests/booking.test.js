@@ -1,6 +1,7 @@
 const request = require('supertest');
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const { JWT_SECRET } = require('../backend/middleware/auth');
 
 // 1. Mock the Database connection pool to isolate test runs from live MySQL instances
 const mockQuery = jest.fn();
@@ -29,7 +30,7 @@ jest.mock('../backend/config/db', () => ({
 const { pool } = require('../backend/config/db');
 
 // Import routes and create a fresh Express instance for testing
-const bookingRoutes = require('../backend/routes/bookings');
+const { router: bookingRoutes } = require('../backend/routes/bookings');
 const app = express();
 app.use(express.json());
 app.use('/api/bookings', bookingRoutes);
@@ -136,7 +137,7 @@ describe('piTrahan Booking API Integration Tests', () => {
         test('Should fail (403) when customer tries to confirm their own booking (Bypass prevention)', async () => {
             // Create customer payload & sign JWT
             const customerPayload = { id: 88, nama: 'Adi', email: 'adi@gmail.com', role: 'customer' };
-            const token = jwt.sign(customerPayload, 'piTrahanSuperSecretKey123!');
+            const token = jwt.sign(customerPayload, JWT_SECRET);
 
             const response = await request(app)
                 .post('/api/bookings/confirm/12')

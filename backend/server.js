@@ -3,7 +3,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const { checkConnection } = require('./config/db');
 const authRoutes = require('./routes/auth');
-const bookingRoutes = require('./routes/bookings');
+const { router: bookingRoutes, autoCancelExpiredBookings } = require('./routes/bookings');
+const profileRoutes = require('./routes/profile');
 require('dotenv').config();
 
 const app = express();
@@ -20,9 +21,9 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Input sanitization constraints: prevent payload injection attacks (limiting body size)
-app.use(express.json({ limit: '10kb' })); // Prevents massive payload DOS
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+// Input sanitization constraints: allow larger payloads for base64 image proofs
+app.use(express.json({ limit: '10mb' })); 
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health Check API
 app.get('/api/health', (req, res) => {
@@ -32,6 +33,7 @@ app.get('/api/health', (req, res) => {
 // Mount Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/profile', profileRoutes);
 
 // 404 Route handler
 app.use((req, res, next) => {
@@ -50,7 +52,18 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start Server
+// Start Server & TTL Auto-cancel checker interval (every 30 seconds)
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode.`);
+    
+    // Auto-cancel TTL checker setup
+    if (process.env.NODE_ENV !== 'test') {
+        setInterval(async () => {
+            try {
+                await autoCancelExpiredBookings();
+            } catch (err) {
+                console.error('[piTrahan Scheduler] Error executing autoCancelExpiredBookings:', err);
+            }
+        }, 30000); // 30 seconds
+    }
 });

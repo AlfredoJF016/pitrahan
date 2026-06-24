@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS bikes (
     jenis_sepeda ENUM('gunung', 'lipat', 'onthel', 'city_bike') NOT NULL,
     harga_per_jam DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     harga_per_hari DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    deposit_fee DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     foto_url VARCHAR(255) DEFAULT NULL,
     status_ketersediaan ENUM('tersedia', 'disewa', 'servis') NOT NULL DEFAULT 'tersedia',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -58,7 +59,10 @@ CREATE TABLE IF NOT EXISTS bookings (
     tanggal_ambil DATETIME NOT NULL,
     durasi_sewa INT NOT NULL, -- Duration in hours or days (application logic defines hours/days)
     total_harga DECIMAL(12, 2) NOT NULL,
-    status_booking ENUM('pending', 'confirmed', 'rejected', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
+    metode_pembayaran ENUM('qris', 'transfer', 'offline') NOT NULL DEFAULT 'offline',
+    bukti_transfer LONGTEXT DEFAULT NULL,
+    bukti_sent_at TIMESTAMP NULL DEFAULT NULL,
+    status_booking ENUM('pending', 'confirmed', 'rejected', 'completed', 'cancelled', 'expired') NOT NULL DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_booking_customer FOREIGN KEY (customer_id) 
         REFERENCES users(id) ON DELETE SET NULL,
