@@ -10,7 +10,8 @@ ALTER TABLE users
   ADD COLUMN kyc_doc_url      TEXT          DEFAULT NULL AFTER no_telepon,
   ADD COLUMN is_kyc_verified  TINYINT(1)    NOT NULL DEFAULT 0 AFTER kyc_doc_url,
   ADD COLUMN is_anonymized    TINYINT(1)    NOT NULL DEFAULT 0 AFTER is_kyc_verified,
-  ADD COLUMN anonymized_at    DATETIME      DEFAULT NULL AFTER is_anonymized,
+  ADD COLUMN is_banned        TINYINT(1)    NOT NULL DEFAULT 0 AFTER is_anonymized,
+  ADD COLUMN anonymized_at    DATETIME      DEFAULT NULL AFTER is_banned,
   ADD COLUMN last_seen_at     DATETIME      DEFAULT NULL AFTER anonymized_at;
 
 -- 2. Alter rentals_stores table to store GPS Coordinates for MITRA (Owners)

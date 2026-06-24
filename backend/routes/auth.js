@@ -107,6 +107,14 @@ router.post('/login',
                 });
             }
 
+            // Reject banned or anonymized accounts
+            if (user.is_anonymized === 1) {
+                return res.status(403).json({ success: false, message: 'Akun ini telah dihapus.' });
+            }
+            if (user.is_banned === 1) {
+                return res.status(403).json({ success: false, message: 'Akun Anda telah diblokir oleh administrator. Hubungi dukungan untuk bantuan.' });
+            }
+
             // Generate JWT payload
             const payload = {
                 id: user.id,
@@ -199,6 +207,94 @@ router.post('/change-password',
         } catch (error) {
             console.error('Change Password Error:', error);
             res.status(500).json({ success: false, message: 'Terjadi kesalahan sistem saat mengubah password.' });
+        }
+    }
+);
+
+/**
+ * @route GET /api/auth/admin/users
+ * @desc Get all users (Admin only)
+ * @access Private (Admin Only)
+ */
+router.get('/admin/users',
+    authenticateToken,
+    async (req, res) => {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: 'Akses ditolak: hanya admin.' });
+        }
+        try {
+            const [users] = await pool.query(
+                `SELECT id, nama, email, role, is_kyc_verified, is_anonymized, is_banned, created_at,
+                        (SELECT COUNT(*) FROM active_sessions WHERE user_id = users.id) AS session_count
+                 FROM users
+                 WHERE is_anonymized = 0
+                 ORDER BY created_at DESC
+                 LIMIT 500`
+            );
+            res.json({ success: true, count: users.length, data: users });
+        } catch (err) {
+            console.error('Admin Users Error:', err);
+            res.status(500).json({ success: false, message: 'Gagal mengambil daftar pengguna.' });
+        }
+    }
+);
+
+/**
+ * @route POST /api/auth/admin/users/:id/ban
+ * @desc Toggle ban/unban a user (Admin only)
+ * @access Private (Admin Only)
+ */
+router.post('/admin/users/:id/ban',
+    authenticateToken,
+    async (req, res) => {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: 'Akses ditolak: hanya admin.' });
+        }
+        const targetId = parseInt(req.params.id);
+        if (targetId === req.user.id) {
+            return res.status(400).json({ success: false, message: 'Admin tidak dapat memblokir akun sendiri.' });
+        }
+        try {
+            const [rows] = await pool.query('SELECT role, is_anonymized FROM users WHERE id = ?', [targetId]);
+            if (rows.length === 0 || rows[0].is_anonymized === 1) {
+                return res.status(404).json({ success: false, message: 'Pengguna tidak ditemukan atau sudah dihapus.' });
+            }
+            if (rows[0].role === 'admin') {
+                return res.status(403).json({ success: false, message: 'Admin tidak dapat memblokir admin lain.' });
+            }
+            const { action } = req.body; // 'ban' or 'unban'
+            await pool.query('UPDATE users SET is_banned = ? WHERE id = ?', [action === 'ban' ? 1 : 0, targetId]);
+            res.json({ success: true, message: action === 'ban' ? 'Pengguna berhasil diblokir.' : 'Blokir pengguna berhasil dibuka.' });
+        } catch (err) {
+            console.error('Admin Ban User Error:', err);
+            res.status(500).json({ success: false, message: 'Gagal memperbarui status pengguna.' });
+        }
+    }
+);
+
+/**
+ * @route POST /api/auth/admin/users/:id/verify-kyc
+ * @desc Verify or reject KYC for an owner (Admin only)
+ * @access Private (Admin Only)
+ */
+router.post('/admin/users/:id/verify-kyc',
+    authenticateToken,
+    async (req, res) => {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: 'Akses ditolak: hanya admin.' });
+        }
+        const targetId = parseInt(req.params.id);
+        const { approved } = req.body; // boolean
+        try {
+            const [rows] = await pool.query('SELECT role FROM users WHERE id = ?', [targetId]);
+            if (rows.length === 0) {
+                return res.status(404).json({ success: false, message: 'Pengguna tidak ditemukan.' });
+            }
+            await pool.query('UPDATE users SET is_kyc_verified = ? WHERE id = ?', [approved ? 1 : 0, targetId]);
+            res.json({ success: true, message: approved ? 'KYC berhasil diverifikasi.' : 'KYC ditolak.' });
+        } catch (err) {
+            console.error('Admin Verify KYC Error:', err);
+            res.status(500).json({ success: false, message: 'Gagal memverifikasi KYC pengguna.' });
         }
     }
 );

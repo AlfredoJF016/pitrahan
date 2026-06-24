@@ -23,14 +23,14 @@ function getBukti(kode_booking) {
 }
 
 // ─── Komponen: Panel Kirim Bukti Pembayaran ───
-function BuktiPanel({ kode_booking, pemesan }) {
+function BuktiPanel({ kode_booking, pemesan, API_BASE_URL, token }) {
   const fileRef = useRef(null);
   const [preview, setPreview]   = useState(() => getBukti(kode_booking));
   const [uploading, setUploading] = useState(false);
   const [sent, setSent]          = useState(!!getBukti(kode_booking));
   const [showPanel, setShowPanel] = useState(false);
 
-  const handleFile = (e) => {
+  const handleFile = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) return alert('Pilih file gambar (JPG/PNG/WEBP).');
@@ -38,8 +38,25 @@ function BuktiPanel({ kode_booking, pemesan }) {
 
     setUploading(true);
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const base64 = ev.target.result;
+      if (API_BASE_URL) {
+        try {
+          const headers = { 'Content-Type': 'application/json' };
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+          const res = await fetch(`${API_BASE_URL}/bookings/proof/${kode_booking}`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ bukti_transfer: base64 })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || 'Gagal mengirim bukti ke server.');
+        } catch (err) {
+          alert(`❌ ${err.message}`);
+          setUploading(false);
+          return;
+        }
+      }
       setPreview(base64);
       saveBukti(kode_booking, base64);
       setSent(true);
@@ -149,7 +166,7 @@ function BuktiPanel({ kode_booking, pemesan }) {
   );
 }
 
-export default function TicketModal({ bookingData, onClose, onOpenEmail }) {
+export default function TicketModal({ bookingData, onClose, onOpenEmail, API_BASE_URL, token }) {
   if (!bookingData) return null;
 
   const {
@@ -310,7 +327,7 @@ export default function TicketModal({ bookingData, onClose, onOpenEmail }) {
 
         {/* ── Tombol Kirim Bukti Pembayaran ── */}
         {metode_pembayaran !== 'offline' && (
-          <BuktiPanel kode_booking={kode_booking} pemesan={nama_pemesan} />
+          <BuktiPanel kode_booking={kode_booking} pemesan={nama_pemesan} API_BASE_URL={API_BASE_URL} token={token} />
         )}
 
         {/* Tombol Lihat Notifikasi Email (UC-08) */}

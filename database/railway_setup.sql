@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
     kyc_doc_url TEXT DEFAULT NULL,
     is_kyc_verified TINYINT(1) NOT NULL DEFAULT 0,
     is_anonymized TINYINT(1) NOT NULL DEFAULT 0,
+    is_banned TINYINT(1) NOT NULL DEFAULT 0,
     anonymized_at DATETIME DEFAULT NULL,
     last_seen_at DATETIME DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

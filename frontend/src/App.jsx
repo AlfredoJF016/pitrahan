@@ -852,6 +852,8 @@ export default function App() {
             recipient: completedBooking.email || `${completedBooking.nama_pemesan.toLowerCase().replace(/\s+/g, '')}@example.com`,
             booking: completedBooking
           })}
+          API_BASE_URL={API_BASE_URL}
+          token={token}
         />
       )}
 

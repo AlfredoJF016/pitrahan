@@ -75,7 +75,7 @@ function getBukti(kode) {
   catch { return null; }
 }
 
-function BuktiWidget({ kode_booking, logActivity, user }) {
+function BuktiWidget({ kode_booking, logActivity, user, API_BASE_URL, token }) {
   const fileRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState(() => getBukti(kode_booking));
@@ -90,8 +90,21 @@ function BuktiWidget({ kode_booking, logActivity, user }) {
     setLoading(true);
     try {
       const b64 = await readFileAsBase64(file);
+      if (API_BASE_URL) {
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch(`${API_BASE_URL}/bookings/proof/${kode_booking}`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ bukti_transfer: b64 })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Gagal mengirim bukti ke server.');
+      }
       setPreview(b64); saveBukti(kode_booking, b64); setSent(true);
       if (logActivity) logActivity('KIRIM_BUKTI', `Mengunggah bukti pembayaran booking ${kode_booking}.`, user?.role || 'customer', user?.nama || 'Customer');
+    } catch (err) {
+      alert(`❌ ${err.message}`);
     } finally { setLoading(false); }
   };
 
@@ -698,7 +711,7 @@ export default function ProfileDashboardModal({ user, token, API_BASE_URL, onClo
                           </div>
                         </div>
                         {(booking.status === 'pending' || booking.status === 'confirmed') && booking.metode_pembayaran !== 'offline' && (
-                          <BuktiWidget kode_booking={booking.kode_booking} logActivity={logActivity} user={user} />
+                          <BuktiWidget kode_booking={booking.kode_booking} logActivity={logActivity} user={user} API_BASE_URL={API_BASE_URL} token={token} />
                         )}
                       </div>
                     );
